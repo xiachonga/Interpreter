@@ -19,6 +19,7 @@ We also need to support 4 external functions int GET(), void * MALLOC(int), void
 
 A skelton implemnentation ast-interpreter.tgz is provided, and you are welcome to make any changes to the implementation. The provided implementation is able to interpreter the simple program like : 
 
+```
 extern int GET();
 
 extern void * MALLOC(int);
@@ -27,7 +28,6 @@ extern void FREE(void *);
 
 extern void PRINT(int);
 
-```
 int main() {
    int a;
    a = GET();
