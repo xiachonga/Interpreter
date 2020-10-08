@@ -20,10 +20,11 @@ class StackFrame
     std::map<Decl *, int> mVars;
     std::map<Stmt *, int> mExprs;
     /// The current stmt
+    int returnVal;
     Stmt *mPC;
 
 public:
-    StackFrame() : mVars(), mExprs(), mPC()
+    StackFrame() : mVars(), mExprs(), mPC(), returnVal(0)
     {
     }
 
@@ -39,6 +40,15 @@ public:
     {
         assert(haveDecl(decl));
         return mVars.find(decl)->second;
+    }
+
+    inline int getReturnVal()
+    {
+        return returnVal;
+    }
+    inline void setReturnVal(Expr *returnExpr)
+    {
+        returnVal = getStmtVal(returnExpr);
     }
 
     void bindStmt(Stmt *stmt, int val)
@@ -73,6 +83,8 @@ public:
 
 class Environment
 {
+    InterpreterVisitor *mVisitor;
+
     std::vector<StackFrame> mStack;
     std::map<Decl *, int> mVars; // Global vars
 
@@ -112,9 +124,26 @@ public:
             mStack.back().bindDecl(decl, val);
     }
 
-    int getCond(Expr *cond)
+    int getStmtVal(Stmt *stmt)
     {
-        return mStack.back().getStmtVal(cond);
+        return mStack.back().getStmtVal(stmt);
+    }
+
+    void setStmtVal(Stmt *stmt, int val)
+    {
+        mStack.back().bindStmt(stmt, val);
+    }
+
+    void call(CallExpr *callexpr);
+
+    int getReturnVal()
+    {
+        return mStack.back().getReturnVal();
+    }
+
+    void setReturnVal(Expr *returnExpr)
+    {
+        mStack.back().setReturnVal(returnExpr);
     }
 
     /// !TODO Support comparison operation
@@ -126,7 +155,7 @@ public:
         if (bop->isAssignmentOp())
         {
             int val = mStack.back().getStmtVal(right);
-            mStack.back().bindStmt(left, val);
+            setStmtVal(left, val);
             if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(left))
             {
                 Decl *decl = declexpr->getFoundDecl();
@@ -136,63 +165,46 @@ public:
         else
         { //+ - * / > < ==
             int leftVal, rightVal;
-            if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(left))
-            {
-                Decl *decl = declexpr->getFoundDecl();
-                leftVal = getDeclVal(decl);
-            }
-            else
-            {
-                leftVal = mStack.back().getStmtVal(left);
-            }
-            if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(right))
-            {
-                Decl *decl = declexpr->getFoundDecl();
-                rightVal = getDeclVal(decl);
-            }
-            else
-            {
-                rightVal = mStack.back().getStmtVal(right);
-            }
-
+            leftVal = mStack.back().getStmtVal(left);
+            rightVal = mStack.back().getStmtVal(right);
             switch (bop->getOpcode())
             {
             case BO_Add:
             {
-                mStack.back().bindStmt(bop, leftVal + rightVal);
+                setStmtVal(bop, leftVal + rightVal);
                 break;
             }
             case BO_Sub:
             {
-                mStack.back().bindStmt(bop, leftVal - rightVal);
+                setStmtVal(bop, leftVal - rightVal);
                 break;
             }
             case BO_Mul:
             {
-                mStack.back().bindStmt(bop, leftVal * rightVal);
+                setStmtVal(bop, leftVal * rightVal);
                 break;
             }
             case BO_Div:
             {
-                mStack.back().bindStmt(bop, leftVal / rightVal);
+                setStmtVal(bop, leftVal / rightVal);
                 break;
             }
             case BO_LT:
             {
                 int val = leftVal < rightVal ? 1 : 0;
-                mStack.back().bindStmt(bop, val);
+                setStmtVal(bop, val);
                 break;
             }
             case BO_GT:
             {
                 int val = leftVal > rightVal ? 1 : 0;
-                mStack.back().bindStmt(bop, val);
+                setStmtVal(bop, val);
                 break;
             }
             case BO_EQ:
             {
                 int val = leftVal == rightVal ? 1 : 0;
-                mStack.back().bindStmt(bop, val);
+                setStmtVal(bop, val);
                 break;
             }
             default:
@@ -203,7 +215,7 @@ public:
     void integerLiteral(IntegerLiteral *integer)
     {
         int val = integer->getValue().getSExtValue();
-        mStack.back().bindStmt(integer, val);
+        setStmtVal(integer, val);
     }
     void decl(DeclStmt *declstmt)
     {
@@ -225,7 +237,7 @@ public:
             Decl *decl = declref->getFoundDecl();
 
             int val = getDeclVal(decl);
-            mStack.back().bindStmt(declref, val);
+            setStmtVal(declref, val);
         }
     }
 
@@ -236,33 +248,9 @@ public:
         {
             Expr *expr = castexpr->getSubExpr();
             int val = mStack.back().getStmtVal(expr);
-            mStack.back().bindStmt(castexpr, val);
+            setStmtVal(castexpr, val);
         }
     }
 
     /// !TODO Support Function Call
-    void call(CallExpr *callexpr)
-    {
-        mStack.back().setPC(callexpr);
-        int val = 0;
-        FunctionDecl *callee = callexpr->getDirectCallee();
-        if (callee == mInput)
-        {
-            llvm::errs() << "Please Input an Integer Value : ";
-            scanf("%d", &val);
-
-            mStack.back().bindStmt(callexpr, val);
-        }
-        else if (callee == mOutput)
-        {
-            Expr *decl = callexpr->getArg(0);
-            val = mStack.back().getStmtVal(decl);
-            llvm::errs() << val;
-        }
-        else
-        {
-
-            /// You could add your code here for Function call Return
-        }
-    }
 };

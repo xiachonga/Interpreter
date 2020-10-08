@@ -27,13 +27,22 @@ public:
     {
         Expr *cond = ifStmt->getCond();
         Visit(cond);
-        if (mEnv->getCond(cond))
+        if (mEnv->getStmtVal(cond))
         {
             Visit(ifStmt->getThen());
         }
         else if (ifStmt->hasElseStorage())
         {
             Visit(ifStmt->getElse());
+        }
+    }
+
+    virtual void VisitReturnStmt(ReturnStmt *returnStmt)
+    {
+        Expr *returnExpr = returnStmt->getRetValue();
+        Visit(returnExpr);
+        if (returnExpr->getType()->isIntegerType()){
+            mEnv->setReturnVal(returnExpr);
         }
     }
 
@@ -109,6 +118,7 @@ int main(int argc, char **argv)
 
 void Environment::init(TranslationUnitDecl *unit, InterpreterVisitor *mVisitor)
 {
+    this->mVisitor = mVisitor;
     // Global vars in this stack
     mStack.push_back(StackFrame());
     for (TranslationUnitDecl::decl_iterator i = unit->decls_begin(), e = unit->decls_end(); i != e; ++i)
@@ -143,4 +153,55 @@ void Environment::init(TranslationUnitDecl *unit, InterpreterVisitor *mVisitor)
     }
     // main function frame
     mStack.push_back(StackFrame());
+}
+
+void Environment::call(CallExpr *callexpr)
+{
+    mStack.back().setPC(callexpr);
+    FunctionDecl *callee = callexpr->getDirectCallee();
+    if (callee == mInput)
+    {
+        int val = 0;
+        llvm::errs() << "Please Input an Integer Value : ";
+        scanf("%d", &val);
+        mStack.back().bindStmt(callexpr, val);
+    }
+    else if (callee == mOutput)
+    {
+        int val;
+        Expr *decl = callexpr->getArg(0);
+        val = mStack.back().getStmtVal(decl);
+        llvm::errs() << val;
+    }
+    else if (callee == mMalloc)
+    {
+    }
+    else if (callee == mFree)
+    {
+    }
+    else
+    {
+        assert(callexpr->getNumArgs() == callee->getNumParams());
+        std::vector<int> args;
+        for (Expr *arg : callexpr->arguments())
+        {
+            args.push_back(getStmtVal(arg));
+        }
+        mStack.push_back(StackFrame());
+        args = std::vector<int>(args.rbegin(), args.rend());
+        for (VarDecl *varDecl : callee->parameters())
+        {
+            setDeclVal(varDecl, args.back());
+            args.pop_back();
+        }
+        mVisitor->VisitStmt(callee->getBody());
+        if (callee->getReturnType()->isIntegerType())
+        {
+            int val = getReturnVal();
+            mStack.pop_back();
+            setStmtVal(callexpr, val);
+        }
+        else
+            mStack.pop_back();
+    }
 }
