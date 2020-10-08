@@ -79,7 +79,6 @@ public:
     {
         TranslationUnitDecl *decl = Context.getTranslationUnitDecl();
         mEnv.init(decl, &mVisitor);
-
         FunctionDecl *entry = mEnv.getEntry();
         mVisitor.VisitStmt(entry->getBody());
     }
@@ -138,7 +137,7 @@ void Environment::init(TranslationUnitDecl *unit, InterpreterVisitor *mVisitor)
                 Expr *init = varDecl->getInit();
                 mVisitor->Visit(init);
                 int val = mStack.back().getStmtVal(init);
-                mStack.back().bindDecl(varDecl, val);
+                setDeclVal(varDecl, val);
             }
         }
     }

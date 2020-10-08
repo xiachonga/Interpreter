@@ -104,6 +104,14 @@ public:
         return mStack.back().getDeclVal(decl);
     }
 
+    void setDeclVal(Decl *decl, int val)
+    {
+        if (mStack[0].haveDecl(decl))
+            mStack[0].bindDecl(decl, val);
+        else
+            mStack.back().bindDecl(decl, val);
+    }
+
     int getCond(Expr *cond)
     {
         return mStack.back().getStmtVal(cond);
@@ -122,7 +130,7 @@ public:
             if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(left))
             {
                 Decl *decl = declexpr->getFoundDecl();
-                mStack.back().bindDecl(decl, val);
+                setDeclVal(decl, val);
             }
         }
         else
@@ -205,7 +213,7 @@ public:
             Decl *decl = *it;
             if (VarDecl *vardecl = dyn_cast<VarDecl>(decl))
             {
-                mStack.back().bindDecl(vardecl, 0);
+                setDeclVal(vardecl, 0);
             }
         }
     }
