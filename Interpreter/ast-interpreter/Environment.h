@@ -32,10 +32,12 @@ public:
     {
         return mVars.count(decl);
     }
+
     inline void bindDecl(Decl *decl, int val)
     {
         mVars[decl] = val;
     }
+
     inline int getDeclVal(Decl *decl)
     {
         assert(haveDecl(decl));
@@ -46,6 +48,7 @@ public:
     {
         return returnVal;
     }
+
     inline void setReturnVal(Expr *returnExpr)
     {
         returnVal = getStmtVal(returnExpr);
@@ -55,15 +58,18 @@ public:
     {
         mExprs[stmt] = val;
     }
+
     int getStmtVal(Stmt *stmt)
     {
         assert(mExprs.find(stmt) != mExprs.end());
         return mExprs[stmt];
     }
+
     void setPC(Stmt *stmt)
     {
         mPC = stmt;
     }
+    
     Stmt *getPC()
     {
         return mPC;
@@ -83,10 +89,7 @@ public:
 
 class Environment
 {
-    InterpreterVisitor *mVisitor;
-
     std::vector<StackFrame> mStack;
-    std::map<Decl *, int> mVars; // Global vars
 
     FunctionDecl *mFree; /// Declartions to the built-in functions
     FunctionDecl *mMalloc;
@@ -101,8 +104,25 @@ public:
     {
     }
 
-    /// Initialize the Environment
-    void init(TranslationUnitDecl *, InterpreterVisitor *);
+    // Global vars stack or main function stack
+    void init()
+    {
+        mStack.push_back(StackFrame());
+    }
+
+    void setFunctionDecl(FunctionDecl *functionDecl)
+    {
+        if (functionDecl->getName().equals("FREE"))
+            mFree = functionDecl;
+        else if (functionDecl->getName().equals("MALLOC"))
+            mMalloc = functionDecl;
+        else if (functionDecl->getName().equals("GET"))
+            mInput = functionDecl;
+        else if (functionDecl->getName().equals("PRINT"))
+            mOutput = functionDecl;
+        else if (functionDecl->getName().equals("main"))
+            mEntry = functionDecl;
+    }
 
     FunctionDecl *getEntry()
     {
@@ -134,7 +154,62 @@ public:
         mStack.back().bindStmt(stmt, val);
     }
 
-    void call(CallExpr *callexpr);
+    inline bool isSpecialCallee(CallExpr *callExpr, FunctionDecl *callee)
+    {
+        if (callee == mInput)
+        {
+            int val = 0;
+            llvm::errs() << "Please Input an Integer Value : ";
+            scanf("%d", &val);
+            mStack.back().bindStmt(callExpr, val);
+            return true;
+        }
+        else if (callee == mOutput)
+        {
+            int val;
+            Expr *decl = callExpr->getArg(0);
+            val = mStack.back().getStmtVal(decl);
+            llvm::errs() << val;
+            return true;
+        }
+        else if (callee == mMalloc)
+        {
+            return true;
+        }
+        else if (callee == mFree)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    inline void beforeCall(CallExpr *callExpr, FunctionDecl *callee)
+    {
+        std::vector<int> args;
+        for (Expr *arg : callExpr->arguments())
+        {
+            args.push_back(getStmtVal(arg));
+        }
+        args = std::vector<int>(args.rbegin(), args.rend());
+        mStack.push_back(StackFrame());
+        for (VarDecl *varDecl : callee->parameters())
+        {
+            setDeclVal(varDecl, args.back());
+            args.pop_back();
+        }
+    }
+
+    inline void afterCall(CallExpr *callExpr, FunctionDecl *callee)
+    {
+        if (callee->getReturnType()->isIntegerType())
+        {
+            int val = getReturnVal();
+            mStack.pop_back();
+            setStmtVal(callExpr, val);
+        }
+        else
+            mStack.pop_back();
+    }
 
     int getReturnVal()
     {
@@ -164,9 +239,8 @@ public:
         }
         else
         { //+ - * / > < ==
-            int leftVal, rightVal;
-            leftVal = mStack.back().getStmtVal(left);
-            rightVal = mStack.back().getStmtVal(right);
+            int leftVal = mStack.back().getStmtVal(left);
+            int rightVal = mStack.back().getStmtVal(right);
             switch (bop->getOpcode())
             {
             case BO_Add:
@@ -212,45 +286,4 @@ public:
             }
         }
     }
-    void integerLiteral(IntegerLiteral *integer)
-    {
-        int val = integer->getValue().getSExtValue();
-        setStmtVal(integer, val);
-    }
-    void decl(DeclStmt *declstmt)
-    {
-        for (DeclStmt::decl_iterator it = declstmt->decl_begin(), ie = declstmt->decl_end();
-             it != ie; ++it)
-        {
-            Decl *decl = *it;
-            if (VarDecl *vardecl = dyn_cast<VarDecl>(decl))
-            {
-                setDeclVal(vardecl, 0);
-            }
-        }
-    }
-    void declref(DeclRefExpr *declref)
-    {
-        mStack.back().setPC(declref);
-        if (declref->getType()->isIntegerType())
-        {
-            Decl *decl = declref->getFoundDecl();
-
-            int val = getDeclVal(decl);
-            setStmtVal(declref, val);
-        }
-    }
-
-    void cast(CastExpr *castexpr)
-    {
-        mStack.back().setPC(castexpr);
-        if (castexpr->getType()->isIntegerType())
-        {
-            Expr *expr = castexpr->getSubExpr();
-            int val = mStack.back().getStmtVal(expr);
-            setStmtVal(castexpr, val);
-        }
-    }
-
-    /// !TODO Support Function Call
 };

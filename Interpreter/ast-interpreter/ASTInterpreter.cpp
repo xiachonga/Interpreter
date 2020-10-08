@@ -20,7 +20,8 @@ public:
 
     virtual void VisitIntegerLiteral(IntegerLiteral *integer)
     {
-        mEnv->integerLiteral(integer);
+        int val = integer->getValue().getSExtValue();
+        mEnv->setStmtVal(integer, val);
     }
 
     virtual void VisitIfStmt(IfStmt *ifStmt)
@@ -41,7 +42,8 @@ public:
     {
         Expr *returnExpr = returnStmt->getRetValue();
         Visit(returnExpr);
-        if (returnExpr->getType()->isIntegerType()){
+        if (returnExpr->getType()->isIntegerType())
+        {
             mEnv->setReturnVal(returnExpr);
         }
     }
@@ -51,24 +53,60 @@ public:
         VisitStmt(bop);
         mEnv->binop(bop);
     }
-    virtual void VisitDeclRefExpr(DeclRefExpr *expr)
+
+    virtual void VisitDeclRefExpr(DeclRefExpr *declRefExpr)
     {
-        VisitStmt(expr);
-        mEnv->declref(expr);
+        VisitStmt(declRefExpr);
+        if (declRefExpr->getType()->isIntegerType())
+        {
+            Decl *decl = declRefExpr->getFoundDecl();
+            int val = mEnv->getDeclVal(decl);
+            mEnv->setStmtVal(declRefExpr, val);
+        }
     }
-    virtual void VisitCastExpr(CastExpr *expr)
+
+    virtual void VisitCastExpr(CastExpr *castExpr)
     {
-        VisitStmt(expr);
-        mEnv->cast(expr);
+        VisitStmt(castExpr);
+        if (castExpr->getType()->isIntegerType())
+        {
+            Expr *subExpr = castExpr->getSubExpr();
+            int val = mEnv->getStmtVal(subExpr);
+            mEnv->setStmtVal(castExpr, val);
+        }
     }
-    virtual void VisitCallExpr(CallExpr *call)
+    
+    virtual void VisitCallExpr(CallExpr *callExpr)
     {
-        VisitStmt(call);
-        mEnv->call(call);
+        VisitStmt(callExpr);
+        FunctionDecl *callee = callExpr->getDirectCallee();
+        if (!mEnv->isSpecialCallee(callExpr, callee))
+        {
+            mEnv->beforeCall(callExpr, callee);
+            VisitStmt(callee->getBody());
+            mEnv->afterCall(callExpr, callee);
+        }
     }
-    virtual void VisitDeclStmt(DeclStmt *declstmt)
+
+    void AddVarDecl(VarDecl *varDecl)
     {
-        mEnv->decl(declstmt);
+        mEnv->setDeclVal(varDecl, 0);
+        if (varDecl->hasInit())
+        {
+            Expr *init = varDecl->getInit();
+            Visit(init);
+            int val = mEnv->getStmtVal(init);
+            mEnv->setDeclVal(varDecl, val);
+        }
+    }
+
+    virtual void VisitDeclStmt(DeclStmt *declStmt)
+    {
+        for (Decl *decl : declStmt->decls())
+        {
+            if (VarDecl *varDecl = dyn_cast<VarDecl>(decl))
+                AddVarDecl(varDecl);
+        }
     }
 
 private:
@@ -86,10 +124,23 @@ public:
 
     virtual void HandleTranslationUnit(clang::ASTContext &Context)
     {
-        TranslationUnitDecl *decl = Context.getTranslationUnitDecl();
-        mEnv.init(decl, &mVisitor);
-        FunctionDecl *entry = mEnv.getEntry();
-        mVisitor.VisitStmt(entry->getBody());
+        TranslationUnitDecl *unitDecl = Context.getTranslationUnitDecl();
+        mEnv.init();
+        for (Decl *decl : unitDecl->decls())
+        {
+            if (FunctionDecl *functionDecl = dyn_cast<FunctionDecl>(decl))
+            {
+                mEnv.setFunctionDecl(functionDecl);
+            }
+            else if (VarDecl *varDecl = dyn_cast<VarDecl>(decl))
+            {
+                mVisitor.AddVarDecl(varDecl);
+            }
+        }
+        if (FunctionDecl *entry = mEnv.getEntry())
+        {
+            mVisitor.VisitStmt(entry->getBody());
+        }
     }
 
 private:
@@ -113,95 +164,5 @@ int main(int argc, char **argv)
     if (argc > 1)
     {
         clang::tooling::runToolOnCode(std::unique_ptr<clang::FrontendAction>(new InterpreterClassAction), argv[1]);
-    }
-}
-
-void Environment::init(TranslationUnitDecl *unit, InterpreterVisitor *mVisitor)
-{
-    this->mVisitor = mVisitor;
-    // Global vars in this stack
-    mStack.push_back(StackFrame());
-    for (TranslationUnitDecl::decl_iterator i = unit->decls_begin(), e = unit->decls_end(); i != e; ++i)
-    {
-        if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(*i))
-        {
-            if (fdecl->getName().equals("FREE"))
-                mFree = fdecl;
-            else if (fdecl->getName().equals("MALLOC"))
-                mMalloc = fdecl;
-            else if (fdecl->getName().equals("GET"))
-                mInput = fdecl;
-            else if (fdecl->getName().equals("PRINT"))
-                mOutput = fdecl;
-            else if (fdecl->getName().equals("main"))
-                mEntry = fdecl;
-            else
-            {
-            }
-        }
-        else if (VarDecl *varDecl = dyn_cast<VarDecl>(*i))
-        {
-            mStack.back().bindDecl(varDecl, 0);
-            if (varDecl->hasInit())
-            {
-                Expr *init = varDecl->getInit();
-                mVisitor->Visit(init);
-                int val = mStack.back().getStmtVal(init);
-                setDeclVal(varDecl, val);
-            }
-        }
-    }
-    // main function frame
-    mStack.push_back(StackFrame());
-}
-
-void Environment::call(CallExpr *callexpr)
-{
-    mStack.back().setPC(callexpr);
-    FunctionDecl *callee = callexpr->getDirectCallee();
-    if (callee == mInput)
-    {
-        int val = 0;
-        llvm::errs() << "Please Input an Integer Value : ";
-        scanf("%d", &val);
-        mStack.back().bindStmt(callexpr, val);
-    }
-    else if (callee == mOutput)
-    {
-        int val;
-        Expr *decl = callexpr->getArg(0);
-        val = mStack.back().getStmtVal(decl);
-        llvm::errs() << val;
-    }
-    else if (callee == mMalloc)
-    {
-    }
-    else if (callee == mFree)
-    {
-    }
-    else
-    {
-        assert(callexpr->getNumArgs() == callee->getNumParams());
-        std::vector<int> args;
-        for (Expr *arg : callexpr->arguments())
-        {
-            args.push_back(getStmtVal(arg));
-        }
-        mStack.push_back(StackFrame());
-        args = std::vector<int>(args.rbegin(), args.rend());
-        for (VarDecl *varDecl : callee->parameters())
-        {
-            setDeclVal(varDecl, args.back());
-            args.pop_back();
-        }
-        mVisitor->VisitStmt(callee->getBody());
-        if (callee->getReturnType()->isIntegerType())
-        {
-            int val = getReturnVal();
-            mStack.pop_back();
-            setStmtVal(callexpr, val);
-        }
-        else
-            mStack.pop_back();
     }
 }
