@@ -38,6 +38,25 @@ public:
         }
     }
 
+    virtual void VisitForStmt(ForStmt *forStmt)
+    {
+        Stmt *init = forStmt->getInit();
+        Expr *cond = forStmt->getCond();
+        Expr *inc = forStmt->getInc();
+        for (Visit(init), Visit(cond); mEnv->getStmtVal(cond); Visit(inc), Visit(cond))
+            Visit(forStmt->getBody());
+    }
+
+    virtual void VisitWhileStmt(WhileStmt *whileStmt)
+    {
+        Expr *cond = whileStmt->getCond();
+        Visit(cond);
+        while (mEnv->getStmtVal(cond)){
+            Visit(whileStmt->getBody());
+            Visit(cond);
+        }
+    }
+
     virtual void VisitReturnStmt(ReturnStmt *returnStmt)
     {
         Expr *returnExpr = returnStmt->getRetValue();
