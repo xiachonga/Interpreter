@@ -48,6 +48,22 @@ public:
         }
     }
 
+    virtual void VisitUnaryOperator(UnaryOperator *unaryOp)
+    {
+        VisitStmt(unaryOp);
+        int val = mEnv->getStmtVal(unaryOp->getSubExpr());
+        switch (unaryOp->getOpcode())
+        {
+        case UO_Minus:
+            mEnv->setStmtVal(unaryOp, -val);
+            break;
+        default:
+            unaryOp->dumpColor();
+            assert(0);
+            break;
+        }
+    }
+
     virtual void VisitBinaryOperator(BinaryOperator *bop)
     {
         VisitStmt(bop);
@@ -75,7 +91,7 @@ public:
             mEnv->setStmtVal(castExpr, val);
         }
     }
-    
+
     virtual void VisitCallExpr(CallExpr *callExpr)
     {
         VisitStmt(callExpr);
