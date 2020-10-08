@@ -24,7 +24,6 @@ public:
     StackFrame() : mVars(), mExprs(), mPC()
     {
     }
-
     void bindDecl(Decl *decl, int val)
     {
         mVars[decl] = val;
@@ -80,7 +79,12 @@ public:
     Environment() : mStack(), mFree(NULL), mMalloc(NULL), mInput(NULL), mOutput(NULL), mEntry(NULL)
     {
     }
-
+    std::vector<StackFrame> getStack() {
+        return mStack;    
+    }
+    void addDecl(Decl *decl, int val) {
+        mStack.back().bindDecl(decl, val);
+    }
     /// Initialize the Environment
     void init(TranslationUnitDecl *unit)
     {
@@ -195,18 +199,6 @@ public:
     {
         int val = integer->getValue().getSExtValue();
         mStack.back().bindStmt(integer, val);
-    }
-    void decl(DeclStmt *declstmt)
-    {
-        for (DeclStmt::decl_iterator it = declstmt->decl_begin(), ie = declstmt->decl_end();
-             it != ie; ++it)
-        {
-            Decl *decl = *it;
-            if (VarDecl *vardecl = dyn_cast<VarDecl>(decl))
-            {
-                mStack.back().bindDecl(vardecl, 0);
-            }
-        }
     }
     void declref(DeclRefExpr *declref)
     {

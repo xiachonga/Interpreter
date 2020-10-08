@@ -50,7 +50,21 @@ public:
     }
     virtual void VisitDeclStmt(DeclStmt *declstmt)
     {
-        mEnv->decl(declstmt);
+        //mEnv->decl(declstmt);
+        for (DeclStmt::decl_iterator it = declstmt->decl_begin(), ie = declstmt->decl_end();
+             it != ie; ++it)
+        {
+            Decl *decl = *it;
+            if (VarDecl *varDecl = dyn_cast<VarDecl>(decl))
+            {
+                if (varDecl->hasInit()) {
+                   Visit(varDecl->getInit());
+                   mEnv->addDecl(varDecl, mEnv->getStack().back().getStmtVal(varDecl->getInit()));
+                } else {
+                   mEnv->addDecl(varDecl, 0);
+                }
+            }
+        }
     }
 
 private:
