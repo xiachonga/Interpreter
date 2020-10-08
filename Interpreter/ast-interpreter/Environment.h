@@ -115,8 +115,8 @@ public:
         Expr *right = bop->getRHS();
 
         if (bop->isAssignmentOp())
-        {x
-            int val = mStack.back().getStmtVal(right);
+        {
+            x int val = mStack.back().getStmtVal(right);
             mStack.back().bindStmt(left, val);
             if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(left))
             {

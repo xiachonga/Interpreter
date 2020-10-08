@@ -70,7 +70,7 @@ public:
     {
         TranslationUnitDecl *decl = Context.getTranslationUnitDecl();
         mEnv.init(decl);
-
+        
         FunctionDecl *entry = mEnv.getEntry();
         mVisitor.VisitStmt(entry->getBody());
     }
