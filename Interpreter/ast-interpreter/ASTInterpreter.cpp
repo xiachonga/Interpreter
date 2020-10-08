@@ -95,13 +95,6 @@ int main(int argc, char **argv)
 {
     if (argc > 1)
     {
-        ifstream ifile(argv[1]);
-        ostringstream buf;
-        char ch;
-        while (buf && ifile.get(ch))
-        {
-            buf.put(ch);
-        }
-        clang::tooling::runToolOnCode(std::unique_ptr<clang::FrontendAction>(new InterpreterClassAction), buf.str());
+        clang::tooling::runToolOnCode(std::unique_ptr<clang::FrontendAction>(new InterpreterClassAction), argv[1]);
     }
 }
