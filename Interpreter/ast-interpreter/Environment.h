@@ -116,7 +116,7 @@ public:
 
         if (bop->isAssignmentOp())
         {
-            x int val = mStack.back().getStmtVal(right);
+            int val = mStack.back().getStmtVal(right);
             mStack.back().bindStmt(left, val);
             if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(left))
             {
