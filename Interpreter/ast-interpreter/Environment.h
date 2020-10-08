@@ -11,6 +11,8 @@
 
 using namespace clang;
 
+class InterpreterVisitor;
+
 class StackFrame
 {
     /// StackFrame maps Variable Declaration to Value
@@ -25,15 +27,20 @@ public:
     {
     }
 
-    void bindDecl(Decl *decl, int val)
+    inline int haveDecl(Decl *decl)
+    {
+        return mVars.count(decl);
+    }
+    inline void bindDecl(Decl *decl, int val)
     {
         mVars[decl] = val;
     }
-    int getDeclVal(Decl *decl)
+    inline int getDeclVal(Decl *decl)
     {
-        assert(mVars.find(decl) != mVars.end());
+        assert(haveDecl(decl));
         return mVars.find(decl)->second;
     }
+
     void bindStmt(Stmt *stmt, int val)
     {
         mExprs[stmt] = val;
@@ -67,6 +74,7 @@ public:
 class Environment
 {
     std::vector<StackFrame> mStack;
+    std::map<Decl *, int> mVars; // Global vars
 
     FunctionDecl *mFree; /// Declartions to the built-in functions
     FunctionDecl *mMalloc;
@@ -82,30 +90,23 @@ public:
     }
 
     /// Initialize the Environment
-    void init(TranslationUnitDecl *unit)
-    {
-        for (TranslationUnitDecl::decl_iterator i = unit->decls_begin(), e = unit->decls_end(); i != e; ++i)
-        {
-            if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(*i))
-            {
-                if (fdecl->getName().equals("FREE"))
-                    mFree = fdecl;
-                else if (fdecl->getName().equals("MALLOC"))
-                    mMalloc = fdecl;
-                else if (fdecl->getName().equals("GET"))
-                    mInput = fdecl;
-                else if (fdecl->getName().equals("PRINT"))
-                    mOutput = fdecl;
-                else if (fdecl->getName().equals("main"))
-                    mEntry = fdecl;
-            }
-        }
-        mStack.push_back(StackFrame());
-    }
+    void init(TranslationUnitDecl *, InterpreterVisitor *);
 
     FunctionDecl *getEntry()
     {
         return mEntry;
+    }
+
+    int getDeclVal(Decl *decl)
+    {
+        if (mStack[0].haveDecl(decl))
+            return mStack[0].getDeclVal(decl);
+        return mStack.back().getDeclVal(decl);
+    }
+
+    int getCond(Expr *cond)
+    {
+        return mStack.back().getStmtVal(cond);
     }
 
     /// !TODO Support comparison operation
@@ -130,7 +131,7 @@ public:
             if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(left))
             {
                 Decl *decl = declexpr->getFoundDecl();
-                leftVal = mStack.back().getDeclVal(decl);
+                leftVal = getDeclVal(decl);
             }
             else
             {
@@ -139,7 +140,7 @@ public:
             if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(right))
             {
                 Decl *decl = declexpr->getFoundDecl();
-                rightVal = mStack.back().getDeclVal(decl);
+                rightVal = getDeclVal(decl);
             }
             else
             {
@@ -215,7 +216,7 @@ public:
         {
             Decl *decl = declref->getFoundDecl();
 
-            int val = mStack.back().getDeclVal(decl);
+            int val = getDeclVal(decl);
             mStack.back().bindStmt(declref, val);
         }
     }

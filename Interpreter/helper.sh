@@ -5,7 +5,7 @@ then
   shift
   docker cp ast-interpreter/ASTInterpreter.cpp compiler2.0:/root/AST_Interpreter
   docker cp ast-interpreter/Environment.h compiler2.0:/root/AST_Interpreter
-  docker exec -t compiler2.0 make
+  docker exec -t compiler2.0 make -j4
   if [ $? -ne 0 ]
   then
     echo "\033[5m\033[31m \n>>>>> Make fail!\n \033[0m"
@@ -41,7 +41,7 @@ then
   shift
   if [ "$1" = "all" ]
   then
-    runtest `ls ./test | grep "test[0-1][1-9].c"`
+    runtest `ls ./test | grep "test[0-1][0-9].c"`
     echo "\033[32m\n>>>>> Total: $total\n>>>>> Pass:  $pass\033[0m"
   else
     runtest $*
