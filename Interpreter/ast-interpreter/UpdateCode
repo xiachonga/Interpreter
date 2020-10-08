@@ -1,0 +1,2 @@
+docker cp ./ASTInterpreter.cpp compiler2.0:/root/AST_Interpreter
+docker cp ./Environment.h compiler2.0:/root/AST_Interpreter
