@@ -64,32 +64,62 @@ public:
         assert(mExprs.find(stmt) != mExprs.end());
         return mExprs[stmt];
     }
-
-    void setPC(Stmt *stmt)
-    {
-        mPC = stmt;
-    }
-    
-    Stmt *getPC()
-    {
-        return mPC;
-    }
 };
 
-/// Heap maps address to a value
-/*
-class Heap {
+class Heap
+{
+    int next;
+    std::map<int, int *> holder;
+    std::map<int, int> sizes;
+
 public:
-   int Malloc(int size) ;
-   void Free (int addr) ;
-   void Update(int addr, int val) ;
-   int get(int addr);
+    int Malloc(int size)
+    {
+        assert(next < next + size);
+        holder[next] = new int[size];
+        sizes[next] = size;
+        next += size;
+        return next - size;
+    }
+    void Free(int addr)
+    {
+        if (holder.count(addr))
+        {
+            holder.erase(addr);
+        }
+    }
+    void Update(int addr, int val)
+    {
+        for (auto pair : holder)
+        {
+            if (addr >= pair.first && addr < pair.first + sizes[pair.first])
+            {
+                pair.second[addr - pair.first] = val;
+                return;
+            }
+        }
+        llvm::errs() << ">>>>> Update Fail! Addr: " << addr << ", val: " << val << "\n";
+        assert(0);
+    }
+    int get(int addr)
+    {
+        for (auto pair : holder)
+        {
+            if (addr >= pair.first && addr < pair.first + sizes[pair.first])
+            {
+                return pair.second[addr - pair.first];
+            }
+        }
+        llvm::errs() << ">>>>> Get Fail! Addr: " << addr << "\n";
+        assert(0);
+        return 0;
+    }
 };
-*/
 
 class Environment
 {
     std::vector<StackFrame> mStack;
+    Heap heap;
 
     FunctionDecl *mFree; /// Declartions to the built-in functions
     FunctionDecl *mMalloc;
@@ -138,10 +168,22 @@ public:
 
     void setDeclVal(Decl *decl, int val)
     {
-        if (mStack[0].haveDecl(decl))
-            mStack[0].bindDecl(decl, val);
+        int addr;
+        if (mStack[0].haveDecl(decl) || mStack.back().haveDecl(decl))
+        {
+            addr = getDeclVal(decl);
+        }
         else
-            mStack.back().bindDecl(decl, val);
+        {
+            addr = heap.Malloc(1);
+            mStack.back().bindDecl(decl, addr);
+        }
+        heap.Update(addr, val);
+    }
+
+    int getRightVal(int addr)
+    {
+        return heap.get(addr);
     }
 
     int getStmtVal(Stmt *stmt)
@@ -161,19 +203,24 @@ public:
             int val = 0;
             llvm::errs() << "Please Input an Integer Value : ";
             scanf("%d", &val);
-            mStack.back().bindStmt(callExpr, val);
+            setStmtVal(callExpr, val);
             return true;
         }
         else if (callee == mOutput)
         {
             int val;
             Expr *decl = callExpr->getArg(0);
-            val = mStack.back().getStmtVal(decl);
+            val = getStmtVal(decl);
             llvm::errs() << val;
             return true;
         }
         else if (callee == mMalloc)
         {
+            int val;
+            Expr *decl = callExpr->getArg(0);
+            val = getStmtVal(decl);
+            val = heap.Malloc(val);
+            setStmtVal(callExpr, val);
             return true;
         }
         else if (callee == mFree)
@@ -229,13 +276,10 @@ public:
 
         if (bop->isAssignmentOp())
         {
-            int val = mStack.back().getStmtVal(right);
-            setStmtVal(left, val);
-            if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(left))
-            {
-                Decl *decl = declexpr->getFoundDecl();
-                setDeclVal(decl, val);
-            }
+            int addr = getStmtVal(left);
+            int val = getStmtVal(right);
+            heap.Update(addr, val);
+            setStmtVal(bop, val);
         }
         else
         { //+ - * / > < ==

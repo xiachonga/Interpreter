@@ -51,7 +51,8 @@ public:
     {
         Expr *cond = whileStmt->getCond();
         Visit(cond);
-        while (mEnv->getStmtVal(cond)){
+        while (mEnv->getStmtVal(cond))
+        {
             Visit(whileStmt->getBody());
             Visit(cond);
         }
@@ -76,8 +77,10 @@ public:
         case UO_Minus:
             mEnv->setStmtVal(unaryOp, -val);
             break;
+        case UO_Deref:
+            mEnv->setStmtVal(unaryOp, val);
+            break;
         default:
-            unaryOp->dumpColor();
             assert(0);
             break;
         }
@@ -89,12 +92,21 @@ public:
         mEnv->binop(bop);
     }
 
+    virtual void VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr *sizeofExpr)
+    {
+        VisitStmt(sizeofExpr);
+        if (sizeofExpr->getKind() == UETT_SizeOf)
+        {
+            mEnv->setStmtVal(sizeofExpr, 1);
+        }
+    }
+
     virtual void VisitDeclRefExpr(DeclRefExpr *declRefExpr)
     {
         VisitStmt(declRefExpr);
-        if (declRefExpr->getType()->isIntegerType())
+        Decl *decl = declRefExpr->getFoundDecl();
+        if (VarDecl *varDecl = dyn_cast<VarDecl>(decl))
         {
-            Decl *decl = declRefExpr->getFoundDecl();
             int val = mEnv->getDeclVal(decl);
             mEnv->setStmtVal(declRefExpr, val);
         }
@@ -103,10 +115,14 @@ public:
     virtual void VisitCastExpr(CastExpr *castExpr)
     {
         VisitStmt(castExpr);
-        if (castExpr->getType()->isIntegerType())
+        if (castExpr->getCastKind() != CK_FunctionToPointerDecay)
         {
             Expr *subExpr = castExpr->getSubExpr();
             int val = mEnv->getStmtVal(subExpr);
+            if (castExpr->getCastKind() == CK_LValueToRValue)
+            {
+                val = mEnv->getRightVal(val);
+            }
             mEnv->setStmtVal(castExpr, val);
         }
     }
@@ -126,12 +142,20 @@ public:
     void AddVarDecl(VarDecl *varDecl)
     {
         mEnv->setDeclVal(varDecl, 0);
-        if (varDecl->hasInit())
+        if (varDecl->getType()->isIntegerType())
         {
-            Expr *init = varDecl->getInit();
-            Visit(init);
-            int val = mEnv->getStmtVal(init);
-            mEnv->setDeclVal(varDecl, val);
+            if (varDecl->hasInit())
+            {
+                Expr *init = varDecl->getInit();
+                Visit(init);
+                int val = mEnv->getStmtVal(init);
+                mEnv->setDeclVal(varDecl, val);
+            }
+            return;
+        }
+        if (const ConstantArrayType *type = dyn_cast<ConstantArrayType>(varDecl->getType().getTypePtr()))
+        {
+            int size = type->getSize().getSExtValue();
         }
     }
 
