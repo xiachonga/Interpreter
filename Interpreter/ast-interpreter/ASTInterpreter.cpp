@@ -43,8 +43,14 @@ public:
         Stmt *init = forStmt->getInit();
         Expr *cond = forStmt->getCond();
         Expr *inc = forStmt->getInc();
-        for (Visit(init), Visit(cond); mEnv->getStmtVal(cond); Visit(inc), Visit(cond))
+        if (init)
+            Visit(init);
+        for (Visit(cond); mEnv->getStmtVal(cond); Visit(cond))
+        {
             Visit(forStmt->getBody());
+            if (inc)
+                Visit(inc);
+        }
     }
 
     virtual void VisitWhileStmt(WhileStmt *whileStmt)
