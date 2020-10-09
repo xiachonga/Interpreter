@@ -211,7 +211,7 @@ public:
             mStack.back().bindStmt(declref, val);
         }
     }
-
+    
     void cast(CastExpr *castexpr)
     {
         mStack.back().setPC(castexpr);
@@ -222,7 +222,7 @@ public:
             mStack.back().bindStmt(castexpr, val);
         }
     }
-
+ 
     /// !TODO Support Function Call
     void call(CallExpr *callexpr)
     {

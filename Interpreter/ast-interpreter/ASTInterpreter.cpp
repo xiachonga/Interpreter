@@ -43,6 +43,19 @@ public:
         VisitStmt(expr);
         mEnv->cast(expr);
     }
+    virtual void VisitIfStmt(IfStmt *expr) 
+    {
+        Visit(expr->getCond());
+        if (mEnv->getStack().back().getStmtVal(expr->getCond())) 
+        {
+           Visit(expr->getThen());
+        } 
+        else 
+        {
+           Visit(expr->getElse());
+        }
+        
+    }
     virtual void VisitCallExpr(CallExpr *call)
     {
         VisitStmt(call);
