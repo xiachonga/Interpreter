@@ -68,6 +68,13 @@ public:
         }
     }
 
+    virtual void VisitParenExpr(ParenExpr *parenExpr)
+    {
+        VisitStmt(parenExpr);
+        int val = mEnv->getStmtVal(parenExpr->getSubExpr());
+        mEnv->setStmtVal(parenExpr, val);
+    }
+
     virtual void VisitUnaryOperator(UnaryOperator *unaryOp)
     {
         VisitStmt(unaryOp);
@@ -81,6 +88,7 @@ public:
             mEnv->setStmtVal(unaryOp, val);
             break;
         default:
+            unaryOp->dumpColor();
             assert(0);
             break;
         }
@@ -141,9 +149,9 @@ public:
 
     void AddVarDecl(VarDecl *varDecl)
     {
-        mEnv->setDeclVal(varDecl, 0);
         if (varDecl->getType()->isIntegerType())
         {
+            mEnv->setDeclVal(varDecl, 0);
             if (varDecl->hasInit())
             {
                 Expr *init = varDecl->getInit();
@@ -156,6 +164,12 @@ public:
         if (const ConstantArrayType *type = dyn_cast<ConstantArrayType>(varDecl->getType().getTypePtr()))
         {
             int size = type->getSize().getSExtValue();
+            mEnv->newDeclVal(varDecl, size);
+            return;
+        }
+        else
+        {
+            mEnv->newDeclVal(varDecl, 1);
         }
     }
 

@@ -61,7 +61,10 @@ public:
 
     int getStmtVal(Stmt *stmt)
     {
-        assert(mExprs.find(stmt) != mExprs.end());
+        if (mExprs.find(stmt) == mExprs.end()){
+            stmt->dumpColor();
+            assert(mExprs.find(stmt) != mExprs.end());
+        }
         return mExprs[stmt];
     }
 };
@@ -164,6 +167,13 @@ public:
         if (mStack[0].haveDecl(decl))
             return mStack[0].getDeclVal(decl);
         return mStack.back().getDeclVal(decl);
+    }
+
+    void newDeclVal(Decl *decl, int size)
+    {
+        int addr = heap.Malloc(size);
+        assert(!mStack.back().haveDecl(decl));
+        mStack.back().bindDecl(decl, addr);
     }
 
     void setDeclVal(Decl *decl, int val)
