@@ -135,6 +135,14 @@ public:
         }
     }
 
+    virtual void VisitArraySubscriptExpr(ArraySubscriptExpr *arraySubscriptExpr)
+    {
+        VisitStmt(arraySubscriptExpr);
+        int base = mEnv->getStmtVal(arraySubscriptExpr->getBase());
+        int indx = mEnv->getStmtVal(arraySubscriptExpr->getIdx());
+        mEnv->setStmtVal(arraySubscriptExpr, base + indx);
+    }
+
     virtual void VisitCallExpr(CallExpr *callExpr)
     {
         VisitStmt(callExpr);
