@@ -121,8 +121,8 @@ public:
         Decl *decl = declRefExpr->getFoundDecl();
         if (VarDecl *varDecl = dyn_cast<VarDecl>(decl))
         {
-            int val = mEnv->getDeclVal(decl);
-            mEnv->setStmtVal(declRefExpr, val);
+            int addr = mEnv->getDeclAddr(decl);
+            mEnv->setStmtVal(declRefExpr, addr);
         }
     }
 
@@ -135,7 +135,7 @@ public:
             int val = mEnv->getStmtVal(subExpr);
             if (castExpr->getCastKind() == CK_LValueToRValue)
             {
-                val = mEnv->getRightVal(val);
+                val = mEnv->memRead(val);
             }
             mEnv->setStmtVal(castExpr, val);
         }
@@ -165,24 +165,28 @@ public:
     {
         if (varDecl->getType()->isIntegerType())
         {
-            mEnv->setDeclVal(varDecl, 0);
+            // int
+            mEnv->newDeclVal(varDecl, 1);
             if (varDecl->hasInit())
             {
                 Expr *init = varDecl->getInit();
                 Visit(init);
+                int addr = mEnv->getDeclAddr(varDecl);
                 int val = mEnv->getStmtVal(init);
-                mEnv->setDeclVal(varDecl, val);
+                mEnv->memWrite(addr, val);
             }
             return;
         }
         if (const ConstantArrayType *type = dyn_cast<ConstantArrayType>(varDecl->getType().getTypePtr()))
         {
+            // int[size]
             int size = type->getSize().getSExtValue();
             mEnv->newDeclVal(varDecl, size);
             return;
         }
         else
         {
+            // Pointer ? int *, int **.
             mEnv->newDeclVal(varDecl, 1);
         }
     }

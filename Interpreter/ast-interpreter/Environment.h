@@ -61,7 +61,8 @@ public:
 
     int getStmtVal(Stmt *stmt)
     {
-        if (mExprs.find(stmt) == mExprs.end()){
+        if (mExprs.find(stmt) == mExprs.end())
+        {
             stmt->dumpColor();
             assert(mExprs.find(stmt) != mExprs.end());
         }
@@ -162,11 +163,14 @@ public:
         return mEntry;
     }
 
-    int getDeclVal(Decl *decl)
+    void memWrite(int addr, int val)
     {
-        if (mStack[0].haveDecl(decl))
-            return mStack[0].getDeclVal(decl);
-        return mStack.back().getDeclVal(decl);
+        heap.Update(addr, val);
+    }
+
+    int memRead(int addr)
+    {
+        return heap.get(addr);
     }
 
     void newDeclVal(Decl *decl, int size)
@@ -176,24 +180,11 @@ public:
         mStack.back().bindDecl(decl, addr);
     }
 
-    void setDeclVal(Decl *decl, int val)
+    int getDeclAddr(Decl *decl)
     {
-        int addr;
-        if (mStack[0].haveDecl(decl) || mStack.back().haveDecl(decl))
-        {
-            addr = getDeclVal(decl);
-        }
-        else
-        {
-            addr = heap.Malloc(1);
-            mStack.back().bindDecl(decl, addr);
-        }
-        heap.Update(addr, val);
-    }
-
-    int getRightVal(int addr)
-    {
-        return heap.get(addr);
+        if (mStack[0].haveDecl(decl))
+            return mStack[0].getDeclVal(decl);
+        return mStack.back().getDeclVal(decl);
     }
 
     int getStmtVal(Stmt *stmt)
@@ -251,7 +242,9 @@ public:
         mStack.push_back(StackFrame());
         for (VarDecl *varDecl : callee->parameters())
         {
-            setDeclVal(varDecl, args.back());
+            newDeclVal(varDecl, 1);
+            int addr = getDeclAddr(varDecl);
+            memWrite(addr, args.back());
             args.pop_back();
         }
     }
