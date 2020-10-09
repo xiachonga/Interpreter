@@ -48,13 +48,70 @@ public:
         Visit(expr->getCond());
         if (mEnv->getStack().back().getStmtVal(expr->getCond())) 
         {
-           Visit(expr->getThen());
+            if (CompoundStmt *then = dyn_cast<CompoundStmt>(expr->getThen())) 
+            {
+                VisitStmt(then);
+            }
+            else 
+            {
+                Visit(expr->getThen());
+            }
         } 
-        else 
+        else if (expr->getElse()) 
         {
-           Visit(expr->getElse());
+            if (CompoundStmt *elseStmt = dyn_cast<CompoundStmt>(expr->getElse())) 
+            {
+                VisitStmt(elseStmt);
+            }
+            else 
+            {
+                Visit(expr->getElse());
+            }
         }
         
+    }
+    virtual void VisitForStmt(ForStmt *expr) 
+    {
+        Visit(expr->getInit());
+
+        while(1) 
+        {
+            Visit(expr->getCond());
+            if (!mEnv->getStack().back().getStmtVal(expr->getCond())) {
+                break;
+            } 
+ 
+            if (CompoundStmt *body = dyn_cast<CompoundStmt>(expr->getBody())) 
+            {
+                VisitStmt(body);
+            }
+            else 
+            {
+                Visit(expr->getBody());
+            }
+                
+            Visit(expr->getInc());
+            //TODO add break、continue语句    
+        }
+    }
+    virtual void VisitWhileStmt(WhileStmt *expr) 
+    {
+        while(1) 
+        {
+            Visit(expr->getCond());
+            if (!mEnv->getStack().back().getStmtVal(expr->getCond())) {
+                break;
+            } 
+            if (CompoundStmt *body = dyn_cast<CompoundStmt>(expr->getBody())) 
+            {
+                VisitStmt(body);
+            }
+            else 
+            {
+                Visit(expr->getBody());
+            }
+            //TODO add break语句    
+        }
     }
     virtual void VisitCallExpr(CallExpr *call)
     {
