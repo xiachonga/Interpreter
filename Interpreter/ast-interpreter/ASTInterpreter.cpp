@@ -164,6 +164,7 @@ public:
     {
         TranslationUnitDecl *decl = Context.getTranslationUnitDecl();
         initEnvironment(decl);
+        mEnv.getStack().push_back(StackFrame());
         FunctionDecl *entry = mEnv.getEntry();
         mVisitor.VisitStmt(entry->getBody());
     }

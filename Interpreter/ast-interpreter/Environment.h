@@ -24,6 +24,10 @@ public:
     StackFrame() : mVars(), mExprs(), mPC()
     {
     }
+    bool hasDeclVal(Decl *decl) 
+    {
+        return mVars.find(decl) != mVars.end();
+    }
     void bindDecl(Decl *decl, int val)
     {
         mVars[decl] = val;
@@ -66,6 +70,7 @@ public:
 class Environment
 {
     std::vector<StackFrame> mStack;
+    StackFrame globalStack;
 
     FunctionDecl *mFree; /// Declartions to the built-in functions
     FunctionDecl *mMalloc;
@@ -79,11 +84,33 @@ public:
     Environment() : mStack(), mFree(NULL), mMalloc(NULL), mInput(NULL), mOutput(NULL), mEntry(NULL)
     {
     }
-    std::vector<StackFrame> getStack() {
+    std::vector<StackFrame> getStack() 
+    {
         return mStack;    
     }
-    void addDecl(Decl *decl, int val) {
+    StackFrame getGlobalStack() 
+    {
+        return globalStack;
+    }
+    void addGlobalDecl(Decl *decl, int val) 
+    {
+        globalStack.bindDecl(decl, val);
+    }
+    void addDecl(Decl *decl, int val) 
+    {
         mStack.back().bindDecl(decl, val);
+    }
+    int getDeclVal(Decl *decl) 
+    {
+        if (mStack.back().hasDeclVal(decl)) 
+        {
+            return mStack.back().getDeclVal(decl);
+        }
+        else
+        {
+            return globalStack.getDeclVal(decl);
+        }
+        
     }
     void setFree(FunctionDecl *mFree) 
     {
@@ -109,6 +136,7 @@ public:
     void init()
     {
         mStack.push_back(StackFrame());
+        globalStack = mStack.back();
     }
 
     FunctionDecl *getEntry()
@@ -144,7 +172,7 @@ public:
             if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(left))
             {
                 Decl *decl = declexpr->getFoundDecl();
-                leftVal = mStack.back().getDeclVal(decl);
+                leftVal = getDeclVal(decl);
             }
             else
             {
@@ -153,7 +181,7 @@ public:
             if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(right))
             {
                 Decl *decl = declexpr->getFoundDecl();
-                rightVal = mStack.back().getDeclVal(decl);
+                rightVal = getDeclVal(decl);
             }
             else
             {
@@ -217,7 +245,7 @@ public:
         {
             Decl *decl = declref->getFoundDecl();
 
-            int val = mStack.back().getDeclVal(decl);
+            int val = getDeclVal(decl);
             mStack.back().bindStmt(declref, val);
         }
     }
