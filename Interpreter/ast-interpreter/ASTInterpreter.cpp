@@ -43,78 +43,80 @@ public:
         VisitStmt(expr);
         mEnv->cast(expr);
     }
-    virtual void VisitUnaryOperator(UnaryOperator *expr) {
+    virtual void VisitUnaryOperator(UnaryOperator *expr)
+    {
         VisitStmt(expr);
         mEnv->unaryOp(expr);
     }
-    virtual void VisitIfStmt(IfStmt *expr) 
+    virtual void VisitIfStmt(IfStmt *expr)
     {
         Visit(expr->getCond());
-        if (mEnv->getStack().back().getStmtVal(expr->getCond())) 
+        if (mEnv->getStack().back().getStmtVal(expr->getCond()))
         {
-            if (CompoundStmt *then = dyn_cast<CompoundStmt>(expr->getThen())) 
+            if (CompoundStmt *then = dyn_cast<CompoundStmt>(expr->getThen()))
             {
                 VisitStmt(then);
             }
-            else 
+            else
             {
                 Visit(expr->getThen());
             }
-        } 
-        else if (expr->getElse()) 
+        }
+        else if (expr->getElse())
         {
-            if (CompoundStmt *elseStmt = dyn_cast<CompoundStmt>(expr->getElse())) 
+            if (CompoundStmt *elseStmt = dyn_cast<CompoundStmt>(expr->getElse()))
             {
                 VisitStmt(elseStmt);
             }
-            else 
+            else
             {
                 Visit(expr->getElse());
             }
         }
-        
     }
-    virtual void VisitForStmt(ForStmt *expr) 
+    virtual void VisitForStmt(ForStmt *expr)
     {
         Visit(expr->getInit());
 
-        while(1) 
+        while (1)
         {
             Visit(expr->getCond());
-            if (!mEnv->getStack().back().getStmtVal(expr->getCond())) {
+            if (!mEnv->getStack().back().getStmtVal(expr->getCond()))
+            {
                 break;
-            } 
- 
-            if (CompoundStmt *body = dyn_cast<CompoundStmt>(expr->getBody())) 
+            }
+
+            if (CompoundStmt *body = dyn_cast<CompoundStmt>(expr->getBody()))
             {
                 VisitStmt(body);
             }
-            else 
+            else
             {
                 Visit(expr->getBody());
             }
-                
+
             Visit(expr->getInc());
-            //TODO add break、continue语句    
+            //TODO add break、continue语句
         }
     }
-    virtual void VisitWhileStmt(WhileStmt *expr) 
+    virtual void VisitWhileStmt(WhileStmt *expr)
     {
-        while(1) 
+        while (1)
         {
             Visit(expr->getCond());
-            if (!mEnv->getStack().back().getStmtVal(expr->getCond())) {
+            if (!mEnv->getStack().back().getStmtVal(expr->getCond()))
+            {
                 break;
-            } 
-            if (CompoundStmt *body = dyn_cast<CompoundStmt>(expr->getBody())) 
+            }
+            if (CompoundStmt *body = dyn_cast<CompoundStmt>(expr->getBody()))
             {
                 VisitStmt(body);
             }
-            else 
+            else
             {
                 Visit(expr->getBody());
             }
-            //TODO add break语句    
+            //TODO add break、continue语句
         }
     }
     virtual void VisitCallExpr(CallExpr *call)
@@ -131,11 +133,14 @@ public:
             Decl *decl = *it;
             if (VarDecl *varDecl = dyn_cast<VarDecl>(decl))
             {
-                if (varDecl->hasInit()) {
-                   Visit(varDecl->getInit());
-                   mEnv->addDecl(varDecl, mEnv->getStack().back().getStmtVal(varDecl->getInit()));
-                } else {
-                   mEnv->addDecl(varDecl, 0);
+                if (varDecl->hasInit())
+                {
+                    Visit(varDecl->getInit());
+                    mEnv->addDecl(varDecl, mEnv->getStack().back().getStmtVal(varDecl->getInit()));
+                }
+                else
+                {
+                    mEnv->addDecl(varDecl, 0);
                 }
             }
         }
@@ -147,6 +152,7 @@ private:
 
 class InterpreterConsumer : public ASTConsumer
 {
+
 public:
     explicit InterpreterConsumer(const ASTContext &context) : mEnv(),
                                                               mVisitor(context, &mEnv)
@@ -157,8 +163,7 @@ public:
     virtual void HandleTranslationUnit(clang::ASTContext &Context)
     {
         TranslationUnitDecl *decl = Context.getTranslationUnitDecl();
-        mEnv.init(decl);
-        
+        initEnvironment(decl);
         FunctionDecl *entry = mEnv.getEntry();
         mVisitor.VisitStmt(entry->getBody());
     }
@@ -166,6 +171,40 @@ public:
 private:
     Environment mEnv;
     InterpreterVisitor mVisitor;
+
+    void initEnvironment(TranslationUnitDecl *unit)
+    {
+        mEnv.init();
+        for (TranslationUnitDecl::decl_iterator i = unit->decls_begin(), e = unit->decls_end(); i != e; ++i)
+        {
+            if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(*i))
+            {
+                if (fdecl->getName().equals("FREE"))
+                    mEnv.setFree(fdecl);
+                else if (fdecl->getName().equals("MALLOC"))
+                    mEnv.setMalloc(fdecl);
+                else if (fdecl->getName().equals("GET"))
+                    mEnv.setInput(fdecl);
+                else if (fdecl->getName().equals("PRINT"))
+                    mEnv.setOutput(fdecl);
+                else if (fdecl->getName().equals("main"))
+                    mEnv.setEntry(fdecl);
+            }
+            else if (VarDecl *varDecl = dyn_cast<VarDecl>(*i))
+            {
+                if (varDecl->hasInit())
+                {
+                    mVisitor.Visit(varDecl->getInit());
+                    mEnv.addDecl(varDecl, mEnv.getStack().back().getStmtVal(varDecl->getInit()));
+                }
+                else
+                {
+                    mEnv.addDecl(varDecl, 0);
+                }
+            }
+        }
+        
+    }
 };
 
 class InterpreterClassAction : public ASTFrontendAction

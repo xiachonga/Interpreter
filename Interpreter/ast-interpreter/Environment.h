@@ -85,25 +85,29 @@ public:
     void addDecl(Decl *decl, int val) {
         mStack.back().bindDecl(decl, val);
     }
-    /// Initialize the Environment
-    void init(TranslationUnitDecl *unit)
+    void setFree(FunctionDecl *mFree) 
     {
-        for (TranslationUnitDecl::decl_iterator i = unit->decls_begin(), e = unit->decls_end(); i != e; ++i)
-        {
-            if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(*i))
-            {
-                if (fdecl->getName().equals("FREE"))
-                    mFree = fdecl;
-                else if (fdecl->getName().equals("MALLOC"))
-                    mMalloc = fdecl;
-                else if (fdecl->getName().equals("GET"))
-                    mInput = fdecl;
-                else if (fdecl->getName().equals("PRINT"))
-                    mOutput = fdecl;
-                else if (fdecl->getName().equals("main"))
-                    mEntry = fdecl;
-            }
-        }
+        this->mFree = mFree;
+    }
+    void setMalloc(FunctionDecl *mMalloc) 
+    {
+        this->mMalloc = mMalloc;
+    }
+    void setInput(FunctionDecl *mInput) 
+    {
+        this->mInput = mInput;
+    }
+    void setOutput(FunctionDecl *mOutput) 
+    {
+        this->mOutput = mOutput;
+    }
+    void setEntry(FunctionDecl *mEntry) 
+    {
+        this->mEntry = mEntry;
+    }
+    /// Initialize the Environment
+    void init()
+    {
         mStack.push_back(StackFrame());
     }
 
@@ -134,7 +138,8 @@ public:
             }
         }
         else
-        { //+ - * / > < ==
+        { //+ - * / > < == 
+          //TODO <= >= !=  
             int leftVal, rightVal;
             if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(left))
             {
