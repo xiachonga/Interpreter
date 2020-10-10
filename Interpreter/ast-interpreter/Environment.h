@@ -112,6 +112,11 @@ public:
         return mEntry;
     }
 
+    void unaryOp(UnaryOperator *expr) 
+    {
+        Expr* subExpr = expr->getSubExpr();
+        mStack.back().bindStmt(expr, -(mStack.back().getStmtVal(subExpr)));
+    }
     /// !TODO Support comparison operation
     void binop(BinaryOperator *bop)
     {

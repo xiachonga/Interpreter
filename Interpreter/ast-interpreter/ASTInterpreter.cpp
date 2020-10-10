@@ -43,6 +43,10 @@ public:
         VisitStmt(expr);
         mEnv->cast(expr);
     }
+    virtual void VisitUnaryOperator(UnaryOperator *expr) {
+        VisitStmt(expr);
+        mEnv->unaryOp(expr);
+    }
     virtual void VisitIfStmt(IfStmt *expr) 
     {
         Visit(expr->getCond());
