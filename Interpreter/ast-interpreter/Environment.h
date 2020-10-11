@@ -70,7 +70,7 @@ public:
 class Environment
 {
     std::vector<StackFrame> mStack;
-    StackFrame globalStack;
+    //StackFrame globalStack;
 
     FunctionDecl *mFree; /// Declartions to the built-in functions
     FunctionDecl *mMalloc;
@@ -88,17 +88,38 @@ public:
     {
         return mStack;    
     }
-    StackFrame getGlobalStack() 
+
+    void pushStack() 
     {
-        return globalStack;
+        mStack.push_back(StackFrame());     
     }
-    void addGlobalDecl(Decl *decl, int val) 
+    void popStack()
     {
-        globalStack.bindDecl(decl, val);
+        mStack.pop_back();
+    }
+    bool isSpecialCall(FunctionDecl *callee)
+    {
+        if (callee == mInput || callee == mOutput || callee == mMalloc || callee == mFree)
+        {
+            return true;
+        } 
+        else
+        {
+            return false;
+        }
+        
     }
     void addDecl(Decl *decl, int val) 
     {
         mStack.back().bindDecl(decl, val);
+    }
+    void addStmt(Stmt *stmt, int val)
+    {
+        mStack.back().bindStmt(stmt, val);
+    }
+    void setPC(Stmt *stmt) 
+    {
+        mStack.back().setPC(stmt);
     }
     int getDeclVal(Decl *decl) 
     {
@@ -108,7 +129,7 @@ public:
         }
         else
         {
-            return globalStack.getDeclVal(decl);
+            return mStack.front().getDeclVal(decl);
         }
         
     }
@@ -136,7 +157,6 @@ public:
     void init()
     {
         mStack.push_back(StackFrame());
-        globalStack = mStack.back();
     }
 
     FunctionDecl *getEntry()
@@ -240,7 +260,7 @@ public:
     }
     void declref(DeclRefExpr *declref)
     {
-        mStack.back().setPC(declref);
+        //mStack.back().setPC(declref);
         if (declref->getType()->isIntegerType())
         {
             Decl *decl = declref->getFoundDecl();
@@ -252,7 +272,7 @@ public:
     
     void cast(CastExpr *castexpr)
     {
-        mStack.back().setPC(castexpr);
+        //mStack.back().setPC(castexpr);
         if (castexpr->getType()->isIntegerType())
         {
             Expr *expr = castexpr->getSubExpr();
@@ -262,9 +282,9 @@ public:
     }
  
     /// !TODO Support Function Call
-    void call(CallExpr *callexpr)
+    void specialCall(CallExpr *callexpr)
     {
-        mStack.back().setPC(callexpr);
+        //mStack.back().setPC(callexpr);
         int val = 0;
         FunctionDecl *callee = callexpr->getDirectCallee();
         if (callee == mInput)

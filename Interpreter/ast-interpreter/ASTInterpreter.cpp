@@ -121,8 +121,19 @@ public:
     }
     virtual void VisitCallExpr(CallExpr *call)
     {
-        VisitStmt(call);
-        mEnv->call(call);
+        VisitStmt(call);   
+        execCall(call);
+    }
+    virtual void VisitReturnStmt(ReturnStmt* returnStmt)
+    {
+        VisitStmt(returnStmt);
+        if (!mEnv->getStack().back().getPC()) return; //The returnStmt of the main function returns directly
+        if (CallExpr* callExpr = dyn_cast<CallExpr>(mEnv->getStack().back().getPC()))
+        {
+            int val = mEnv->getStack().back().getStmtVal(returnStmt->getRetValue());
+            mEnv->popStack();
+            mEnv->addStmt(callExpr, val);
+        }   
     }
     virtual void VisitDeclStmt(DeclStmt *declstmt)
     {
@@ -145,6 +156,46 @@ public:
             }
         }
     }
+    
+    /// !TODO Support Function Call
+    void execCall(CallExpr *callExpr)
+    {
+        FunctionDecl *callee = callExpr->getDirectCallee(); 
+        if (mEnv->isSpecialCall(callee))
+        {
+            mEnv->specialCall(callExpr);
+        }
+        else
+        {
+            assert(callExpr->getNumArgs() == callee->getNumParams() && "Parameter mismatch");
+            unsigned int argsLength = callExpr->getNumArgs();
+            int argVal[argsLength];
+            for (unsigned int i = 0; i < callExpr->getNumArgs(); i++)
+            {
+                Stmt* arg = callExpr->getArg(i);
+                argVal[i] = mEnv->getStack().back().getStmtVal(arg);
+            }
+            mEnv->pushStack();
+            mEnv->setPC(callExpr);
+            for (unsigned int i = 0; i < callee->getNumParams(); i ++)
+            {
+                if(VarDecl* paramVarDecl = dyn_cast<VarDecl>(callee->getParamDecl(i)))
+                {
+                    mEnv->addDecl(paramVarDecl, argVal[i]);
+                }
+            }
+            Visit(callee->getBody());
+            /*if (ReturnStmt * returnStmt  = dyn_cast<ReturnStmt>(mEnv->getStack().back().getPC()))
+            {
+                returnStmt->dump();
+                int val = mEnv->getStack().back().getStmtVal(returnStmt->getRetValue());
+                cout<<val<<endl;
+                mEnv->getStack().pop_back();
+                mEnv->getStack().back().bindStmt(callExpr, val);
+            }*/
+
+        }
+    }
 
 private:
     Environment *mEnv;
@@ -164,7 +215,7 @@ public:
     {
         TranslationUnitDecl *decl = Context.getTranslationUnitDecl();
         initEnvironment(decl);
-        mEnv.getStack().push_back(StackFrame());
+        mEnv.pushStack();
         FunctionDecl *entry = mEnv.getEntry();
         mVisitor.VisitStmt(entry->getBody());
     }
