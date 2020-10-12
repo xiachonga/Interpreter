@@ -57,20 +57,42 @@ public:
 };
 
 /// Heap maps address to a value
-/*
 class Heap {
+    std::map<int, int> heap;
+    int curr;
 public:
-   int Malloc(int size) ;
-   void Free (int addr) ;
-   void Update(int addr, int val) ;
-   int get(int addr);
+   Heap() : heap(), curr(0) {}
+   int Malloc(int size) 
+   {
+       for (int i = 0; i < size; i ++)
+       {
+           heap[curr + i] = 0; 
+       }
+       int base = curr;
+       curr += size;
+       return base;
+   }
+   void Free (int addr)
+   {
+       //heap.erase(addr, curr);
+       curr = addr -1; 
+   }
+   void Update(int addr, int val) 
+   {
+       assert(heap.find(addr) != heap.end());
+       heap[addr] = val;
+   }
+   int get(int addr)
+   {
+       return heap[addr];
+   }
 };
-*/
+
 
 class Environment
 {
     std::vector<StackFrame> mStack;
-    //StackFrame globalStack;
+    Heap mHeap;
 
     FunctionDecl *mFree; /// Declartions to the built-in functions
     FunctionDecl *mMalloc;
@@ -81,14 +103,17 @@ class Environment
 
 public:
     /// Get the declartions to the built-in functions
-    Environment() : mStack(), mFree(NULL), mMalloc(NULL), mInput(NULL), mOutput(NULL), mEntry(NULL)
+    Environment() : mStack(), mHeap(), mFree(NULL), mMalloc(NULL), mInput(NULL), mOutput(NULL), mEntry(NULL)
     {
     }
     std::vector<StackFrame> getStack() 
     {
         return mStack;    
     }
-
+    Heap getHeap() 
+    {
+        return mHeap;
+    }
     void pushStack() 
     {
         mStack.push_back(StackFrame());     
@@ -182,7 +207,21 @@ public:
             if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(left))
             {
                 Decl *decl = declexpr->getFoundDecl();
-                mStack.back().bindDecl(decl, val);
+                if (mStack.back().hasDeclVal(decl))
+                {
+                    mStack.back().bindDecl(decl, val);
+                }
+                else
+                {
+                    mStack.front().bindDecl(decl, val);
+                }
+                
+            } 
+            else if (ArraySubscriptExpr * array = dyn_cast<ArraySubscriptExpr>(left))
+            {
+                int base = mStack.back().getStmtVal(array->getBase());
+                int idx = mStack.back().getStmtVal(array->getIdx());
+                mHeap.Update(base + idx, val);
             }
         }
         else
@@ -253,6 +292,13 @@ public:
             }
         }
     }
+    void execArray(ArraySubscriptExpr *array) 
+    {
+        int base = mStack.back().getStmtVal(array->getBase());
+        int idx = mStack.back().getStmtVal(array->getIdx());
+        int val = mHeap.get(base + idx);
+        mStack.back().bindStmt(array, val);
+    }
     void integerLiteral(IntegerLiteral *integer)
     {
         int val = integer->getValue().getSExtValue();
@@ -261,10 +307,9 @@ public:
     void declref(DeclRefExpr *declref)
     {
         //mStack.back().setPC(declref);
-        if (declref->getType()->isIntegerType())
+        if (declref->getType()->isIntegerType() || declref->getType()->isConstantArrayType())
         {
             Decl *decl = declref->getFoundDecl();
-
             int val = getDeclVal(decl);
             mStack.back().bindStmt(declref, val);
         }
@@ -273,12 +318,16 @@ public:
     void cast(CastExpr *castexpr)
     {
         //mStack.back().setPC(castexpr);
-        if (castexpr->getType()->isIntegerType())
+        if (castexpr->getType()->isFunctionPointerType())
+        {
+            return;
+        }
+        else if (castexpr->getType()->isIntegerType() || castexpr->getType()->isPointerType())
         {
             Expr *expr = castexpr->getSubExpr();
             int val = mStack.back().getStmtVal(expr);
             mStack.back().bindStmt(castexpr, val);
-        }
+        } 
     }
  
     /// !TODO Support Function Call

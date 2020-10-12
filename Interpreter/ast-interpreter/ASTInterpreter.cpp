@@ -76,10 +76,13 @@ public:
     }
     virtual void VisitForStmt(ForStmt *expr)
     {
-        Visit(expr->getInit());
-
+        if (expr->getInit())
+        {
+             Visit(expr->getInit());
+        }
         while (1)
         {
+            //TODO 条件为空
             Visit(expr->getCond());
             if (!mEnv->getStack().back().getStmtVal(expr->getCond()))
             {
@@ -94,8 +97,10 @@ public:
             {
                 Visit(expr->getBody());
             }
-
-            Visit(expr->getInc());
+            if (expr->getInc()) 
+            {
+                Visit(expr->getInc());
+            }
             //TODO add break、continue语句
         }
     }
@@ -144,19 +149,36 @@ public:
             Decl *decl = *it;
             if (VarDecl *varDecl = dyn_cast<VarDecl>(decl))
             {
-                if (varDecl->hasInit())
+                if (varDecl->getType()->isIntegerType())
                 {
-                    Visit(varDecl->getInit());
-                    mEnv->addDecl(varDecl, mEnv->getStack().back().getStmtVal(varDecl->getInit()));
+                        if (varDecl->hasInit())
+                    {
+                        Visit(varDecl->getInit());
+                        mEnv->addDecl(varDecl, mEnv->getStack().back().getStmtVal(varDecl->getInit()));
+                    }
+                    else
+                    {
+                        mEnv->addDecl(varDecl, 0);
+                    }
                 }
-                else
+                else if (const ConstantArrayType * array = dyn_cast<ConstantArrayType>(varDecl->getType().getTypePtr()))
                 {
-                    mEnv->addDecl(varDecl, 0);
+                    int len = array->getSize().getSExtValue();
+                    int address = mEnv->getHeap().Malloc(len);
+                    mEnv->addDecl(varDecl, address);
                 }
+                
             }
         }
     }
-    
+    virtual void VisitArraySubscriptExpr(ArraySubscriptExpr *array)
+    {
+        VisitStmt(array);
+        mEnv->execArray(array);
+
+    }
+
+
     /// !TODO Support Function Call
     void execCall(CallExpr *callExpr)
     {
@@ -244,14 +266,23 @@ private:
             }
             else if (VarDecl *varDecl = dyn_cast<VarDecl>(*i))
             {
-                if (varDecl->hasInit())
+                if (varDecl->getType()->isIntegerType())
                 {
-                    mVisitor.Visit(varDecl->getInit());
-                    mEnv.addDecl(varDecl, mEnv.getStack().back().getStmtVal(varDecl->getInit()));
+                        if (varDecl->hasInit())
+                    {
+                        mVisitor.Visit(varDecl->getInit());
+                        mEnv.addDecl(varDecl, mEnv.getStack().back().getStmtVal(varDecl->getInit()));
+                    }
+                    else
+                    {
+                        mEnv.addDecl(varDecl, 0);
+                    }
                 }
-                else
+                else if (const ConstantArrayType * array = dyn_cast<ConstantArrayType>(varDecl->getType().getTypePtr()))
                 {
-                    mEnv.addDecl(varDecl, 0);
+                    int len = array->getSize().getSExtValue();
+                    int address = mEnv.getHeap().Malloc(len);
+                    mEnv.addDecl(varDecl, address);
                 }
             }
         }
