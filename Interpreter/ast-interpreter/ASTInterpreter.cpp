@@ -100,10 +100,43 @@ public:
         }
     }
 
-    virtual void VisitBinaryOperator(BinaryOperator *bop)
+    virtual void VisitBinaryOperator(BinaryOperator *binaryOperator)
     {
-        VisitStmt(bop);
-        mEnv->binop(bop);
+        VisitStmt(binaryOperator);
+        Expr *lExpr = binaryOperator->getLHS();
+        Expr *rExpr = binaryOperator->getRHS();
+        int lVal = mEnv->getStmtVal(lExpr);
+        int rVal = mEnv->getStmtVal(rExpr);
+        switch (binaryOperator->getOpcode())
+        {
+        case BO_Assign:
+            mEnv->memWrite(lVal, rVal);
+	    mEnv->setStmtVal(binaryOperator, rVal);
+            break;
+        case BO_Add:
+            mEnv->setStmtVal(binaryOperator, lVal + rVal);
+	    break;
+        case BO_Sub:
+            mEnv->setStmtVal(binaryOperator, lVal - rVal);
+	    break;
+        case BO_Mul:
+            mEnv->setStmtVal(binaryOperator, lVal * rVal);
+	    break;
+        case BO_Div:
+            mEnv->setStmtVal(binaryOperator, lVal / rVal);
+	    break;
+        case BO_LT:
+            mEnv->setStmtVal(binaryOperator, lVal < rVal);
+	    break;
+        case BO_GT:
+            mEnv->setStmtVal(binaryOperator, lVal > rVal);
+	    break;
+        case BO_EQ:
+            mEnv->setStmtVal(binaryOperator, lVal == rVal);
+	    break;
+        default:
+	    break;
+        }
     }
 
     virtual void VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr *sizeofExpr)

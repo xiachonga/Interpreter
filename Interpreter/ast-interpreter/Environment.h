@@ -70,7 +70,7 @@ public:
     }
 };
 
-class Heap
+class Memory
 {
     int next;
     std::map<int, int *> holder;
@@ -123,7 +123,7 @@ public:
 class Environment
 {
     std::vector<StackFrame> mStack;
-    Heap heap;
+    Memory mem;
 
     FunctionDecl *mFree; /// Declartions to the built-in functions
     FunctionDecl *mMalloc;
@@ -165,17 +165,17 @@ public:
 
     void memWrite(int addr, int val)
     {
-        heap.Update(addr, val);
+        mem.Update(addr, val);
     }
 
     int memRead(int addr)
     {
-        return heap.get(addr);
+        return mem.get(addr);
     }
 
     void newDeclVal(Decl *decl, int size)
     {
-        int addr = heap.Malloc(size);
+        int addr = mem.Malloc(size);
         assert(!mStack.back().haveDecl(decl));
         mStack.back().bindDecl(decl, addr);
     }
@@ -220,7 +220,7 @@ public:
             int val;
             Expr *decl = callExpr->getArg(0);
             val = getStmtVal(decl);
-            val = heap.Malloc(val);
+            val = mem.Malloc(val);
             setStmtVal(callExpr, val);
             return true;
         }
@@ -269,68 +269,5 @@ public:
     void setReturnVal(Expr *returnExpr)
     {
         mStack.back().setReturnVal(returnExpr);
-    }
-
-    /// !TODO Support comparison operation
-    void binop(BinaryOperator *bop)
-    {
-        Expr *left = bop->getLHS();
-        Expr *right = bop->getRHS();
-
-        if (bop->isAssignmentOp())
-        {
-            int addr = getStmtVal(left);
-            int val = getStmtVal(right);
-            heap.Update(addr, val);
-            setStmtVal(bop, val);
-        }
-        else
-        { //+ - * / > < ==
-            int leftVal = mStack.back().getStmtVal(left);
-            int rightVal = mStack.back().getStmtVal(right);
-            switch (bop->getOpcode())
-            {
-            case BO_Add:
-            {
-                setStmtVal(bop, leftVal + rightVal);
-                break;
-            }
-            case BO_Sub:
-            {
-                setStmtVal(bop, leftVal - rightVal);
-                break;
-            }
-            case BO_Mul:
-            {
-                setStmtVal(bop, leftVal * rightVal);
-                break;
-            }
-            case BO_Div:
-            {
-                setStmtVal(bop, leftVal / rightVal);
-                break;
-            }
-            case BO_LT:
-            {
-                int val = leftVal < rightVal ? 1 : 0;
-                setStmtVal(bop, val);
-                break;
-            }
-            case BO_GT:
-            {
-                int val = leftVal > rightVal ? 1 : 0;
-                setStmtVal(bop, val);
-                break;
-            }
-            case BO_EQ:
-            {
-                int val = leftVal == rightVal ? 1 : 0;
-                setStmtVal(bop, val);
-                break;
-            }
-            default:
-                break;
-            }
-        }
     }
 };
