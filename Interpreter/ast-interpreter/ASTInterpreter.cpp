@@ -43,10 +43,19 @@ public:
         VisitStmt(expr);
         mEnv->cast(expr);
     }
+    virtual void VisitParenExpr(ParenExpr* expr)
+    {
+        VisitStmt(expr);
+        mEnv->execParenExpr(expr);
+    }
     virtual void VisitUnaryOperator(UnaryOperator *expr)
     {
         VisitStmt(expr);
         mEnv->unaryOp(expr);
+    }
+    virtual void VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr* expr)
+    {
+        mEnv->execSizeOf(expr);
     }
     virtual void VisitIfStmt(IfStmt *expr)
     {
@@ -164,9 +173,19 @@ public:
                 else if (const ConstantArrayType * array = dyn_cast<ConstantArrayType>(varDecl->getType().getTypePtr()))
                 {
                     int len = array->getSize().getSExtValue();
-                    int address = mEnv->getHeap().Malloc(len);
+                    int address = mEnv->mallocHeap(len);
                     mEnv->addDecl(varDecl, address);
                 }
+                else if (varDecl->getType()->isPointerType())
+                {
+                    int base = mEnv->mallocHeap(1);
+                    mEnv->addDecl(varDecl, base);
+                    if (varDecl->hasInit())
+                    {
+                        Visit(varDecl->getInit());
+                        mEnv->updateHeap(base, mEnv->getStack().back().getStmtVal(varDecl->getInit()));
+                    }
+                } 
                 
             }
         }
@@ -207,14 +226,6 @@ public:
                 }
             }
             Visit(callee->getBody());
-            /*if (ReturnStmt * returnStmt  = dyn_cast<ReturnStmt>(mEnv->getStack().back().getPC()))
-            {
-                returnStmt->dump();
-                int val = mEnv->getStack().back().getStmtVal(returnStmt->getRetValue());
-                cout<<val<<endl;
-                mEnv->getStack().pop_back();
-                mEnv->getStack().back().bindStmt(callExpr, val);
-            }*/
 
         }
     }
@@ -281,9 +292,19 @@ private:
                 else if (const ConstantArrayType * array = dyn_cast<ConstantArrayType>(varDecl->getType().getTypePtr()))
                 {
                     int len = array->getSize().getSExtValue();
-                    int address = mEnv.getHeap().Malloc(len);
+                    int address = mEnv.mallocHeap(len);
                     mEnv.addDecl(varDecl, address);
                 }
+                else if (varDecl->getType()->isPointerType())
+                {
+                    int base = mEnv.mallocHeap(1);
+                    mEnv.addDecl(varDecl, base);
+                    if (varDecl->hasInit())
+                    {
+                        mVisitor.Visit(varDecl->getInit());
+                        mEnv.updateHeap(base, mEnv.getStack().back().getStmtVal(varDecl->getInit()));
+                    }
+                } 
             }
         }
         

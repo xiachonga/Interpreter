@@ -59,9 +59,10 @@ public:
 /// Heap maps address to a value
 class Heap {
     std::map<int, int> heap;
+    std::map<int, int> interval;
     int curr;
 public:
-   Heap() : heap(), curr(0) {}
+   Heap() : heap(), interval(), curr(0) {}
    int Malloc(int size) 
    {
        for (int i = 0; i < size; i ++)
@@ -70,12 +71,14 @@ public:
        }
        int base = curr;
        curr += size;
+       interval[base] = curr;
        return base;
    }
    void Free (int addr)
    {
-       //heap.erase(addr, curr);
-       curr = addr -1; 
+       std::map<int,int>::iterator begin = heap.find(addr);
+       std::map<int,int>::iterator end = heap.find(interval[addr]);
+       heap.erase(begin, end); 
    }
    void Update(int addr, int val) 
    {
@@ -87,7 +90,6 @@ public:
        return heap[addr];
    }
 };
-
 
 class Environment
 {
@@ -110,9 +112,13 @@ public:
     {
         return mStack;    
     }
-    Heap getHeap() 
+    int mallocHeap(int size)
     {
-        return mHeap;
+        return mHeap.Malloc(size);
+    }
+    void updateHeap(int base, int val)
+    {
+        mHeap.Update(base, val);
     }
     void pushStack() 
     {
@@ -189,10 +195,27 @@ public:
         return mEntry;
     }
 
+
+    /// execStmt
     void unaryOp(UnaryOperator *expr) 
     {
         Expr* subExpr = expr->getSubExpr();
-        mStack.back().bindStmt(expr, -(mStack.back().getStmtVal(subExpr)));
+        int val = mStack.back().getStmtVal(subExpr);
+        switch (expr->getOpcode())
+        {
+        case UO_Minus:
+            mStack.back().bindStmt(expr, -val);
+            break;
+        case UO_Deref:
+        {
+            val = mHeap.get(val);
+            mStack.back().bindStmt(expr, val);
+            break;
+        }
+        default:
+            break;
+        }
+        
     }
     /// !TODO Support comparison operation
     void binop(BinaryOperator *bop)
@@ -204,6 +227,7 @@ public:
         {
             int val = mStack.back().getStmtVal(right);
             mStack.back().bindStmt(left, val);
+            //update ref value
             if (DeclRefExpr *declexpr = dyn_cast<DeclRefExpr>(left))
             {
                 Decl *decl = declexpr->getFoundDecl();
@@ -217,11 +241,17 @@ public:
                 }
                 
             } 
-            else if (ArraySubscriptExpr * array = dyn_cast<ArraySubscriptExpr>(left))
+            else if (ArraySubscriptExpr* arrayExpr = dyn_cast<ArraySubscriptExpr>(left))
             {
-                int base = mStack.back().getStmtVal(array->getBase());
-                int idx = mStack.back().getStmtVal(array->getIdx());
+                int base = mStack.back().getStmtVal(arrayExpr->getBase());
+                int idx = mStack.back().getStmtVal(arrayExpr->getIdx());
                 mHeap.Update(base + idx, val);
+            } 
+            else if (UnaryOperator* unop = dyn_cast<UnaryOperator>(left)) 
+            {
+                int base = mStack.back().getStmtVal(unop->getSubExpr());
+                //cout<<val<<endl;
+                mHeap.Update(base, val);
             }
         }
         else
@@ -233,7 +263,15 @@ public:
                 Decl *decl = declexpr->getFoundDecl();
                 leftVal = getDeclVal(decl);
             }
-            else
+            else if (left->getType()->isPointerType())
+            {
+                if (ImplicitCastExpr* imp = dyn_cast<ImplicitCastExpr>(left))
+                {
+                    leftVal = mStack.back().getStmtVal(imp->getSubExpr());
+                }
+                    
+            }
+            else 
             {
                 leftVal = mStack.back().getStmtVal(left);
             }
@@ -299,6 +337,15 @@ public:
         int val = mHeap.get(base + idx);
         mStack.back().bindStmt(array, val);
     }
+    void execSizeOf(UnaryExprOrTypeTraitExpr* expr)
+    {
+        mStack.back().bindStmt(expr, 1);
+    }
+    void execParenExpr(ParenExpr* expr)
+    {
+        int val = mStack.back().getStmtVal(expr->getSubExpr());
+        mStack.back().bindStmt(expr, val);
+    }
     void integerLiteral(IntegerLiteral *integer)
     {
         int val = integer->getValue().getSExtValue();
@@ -312,6 +359,13 @@ public:
             Decl *decl = declref->getFoundDecl();
             int val = getDeclVal(decl);
             mStack.back().bindStmt(declref, val);
+        }
+        else if (declref->getType()->isPointerType())
+        {
+            Decl *decl = declref->getFoundDecl();
+            int base = getDeclVal(decl);
+            //int val = mHeap.get(base);
+            mStack.back().bindStmt(declref, base);
         }
     }
     
@@ -349,10 +403,20 @@ public:
             val = mStack.back().getStmtVal(decl);
             llvm::errs() << val;
         }
-        else
+        else if (callee == mMalloc)
         {
-
+            Expr* arg = callexpr->getArg(0);
+            int size = mStack.back().getStmtVal(arg);
+            int base = mHeap.Malloc(size);
+            mStack.back().bindStmt(callexpr, base);
             /// You could add your code here for Function call Return
+        }
+        else if (callee == mFree)
+        {
+            Expr* arg = callexpr->getArg(0);
+            int size = mStack.back().getStmtVal(arg);
+            mHeap.Free(size);
+            return;
         }
     }
 };
