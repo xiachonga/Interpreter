@@ -26,39 +26,47 @@ public:
 
     virtual void VisitIntegerLiteral(IntegerLiteral *integer)
     {
+        if (mEnv->alreadyReturn()) return;
         mEnv->integerLiteral(integer);
     }
     virtual void VisitBinaryOperator(BinaryOperator *bop)
     {
+        if (mEnv->alreadyReturn()) return;
         VisitStmt(bop);
         mEnv->binop(bop);
     }
     virtual void VisitDeclRefExpr(DeclRefExpr *expr)
     {
+        if (mEnv->alreadyReturn()) return;
         VisitStmt(expr);
         mEnv->declref(expr);
     }
     virtual void VisitCastExpr(CastExpr *expr)
     {
+        if (mEnv->alreadyReturn()) return;
         VisitStmt(expr);
         mEnv->cast(expr);
     }
     virtual void VisitParenExpr(ParenExpr* expr)
     {
+        if (mEnv->alreadyReturn()) return;
         VisitStmt(expr);
         mEnv->execParenExpr(expr);
     }
     virtual void VisitUnaryOperator(UnaryOperator *expr)
     {
+        if (mEnv->alreadyReturn()) return;
         VisitStmt(expr);
         mEnv->unaryOp(expr);
     }
     virtual void VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr* expr)
     {
+        if (mEnv->alreadyReturn()) return;
         mEnv->execSizeOf(expr);
     }
     virtual void VisitIfStmt(IfStmt *expr)
     {
+        if (mEnv->alreadyReturn()) return;
         Visit(expr->getCond());
         if (mEnv->getStack().back().getStmtVal(expr->getCond()))
         {
@@ -85,6 +93,7 @@ public:
     }
     virtual void VisitForStmt(ForStmt *expr)
     {
+        if (mEnv->alreadyReturn()) return;
         if (expr->getInit())
         {
              Visit(expr->getInit());
@@ -115,6 +124,7 @@ public:
     }
     virtual void VisitWhileStmt(WhileStmt *expr)
     {
+        if (mEnv->alreadyReturn()) return;
         while (1)
         {
             Visit(expr->getCond());
@@ -135,23 +145,26 @@ public:
     }
     virtual void VisitCallExpr(CallExpr *call)
     {
+        if (mEnv->alreadyReturn()) return;
         VisitStmt(call);   
         execCall(call);
     }
     virtual void VisitReturnStmt(ReturnStmt* returnStmt)
     {
+        if (mEnv->alreadyReturn()) return;
         VisitStmt(returnStmt);
         if (!mEnv->getStack().back().getPC()) return; //The returnStmt of the main function returns directly
         if (CallExpr* callExpr = dyn_cast<CallExpr>(mEnv->getStack().back().getPC()))
         {
             int val = mEnv->getStack().back().getStmtVal(returnStmt->getRetValue());
-            mEnv->popStack();
             mEnv->addStmt(callExpr, val);
+            mEnv->setAlreadyReturn();
         }   
     }
     virtual void VisitDeclStmt(DeclStmt *declstmt)
     {
         //mEnv->decl(declstmt);
+        if (mEnv->alreadyReturn()) return;
         for (DeclStmt::decl_iterator it = declstmt->decl_begin(), ie = declstmt->decl_end();
              it != ie; ++it)
         {
@@ -192,6 +205,7 @@ public:
     }
     virtual void VisitArraySubscriptExpr(ArraySubscriptExpr *array)
     {
+        if (mEnv->alreadyReturn()) return;
         VisitStmt(array);
         mEnv->execArray(array);
 
@@ -226,7 +240,14 @@ public:
                 }
             }
             Visit(callee->getBody());
-
+            if (mEnv->alreadyReturn()) { 
+                int val = mEnv->getStack().back().getStmtVal(callExpr);
+                mEnv->popStack();
+                mEnv->addStmt(callExpr, val);
+            } else { //returnType is void
+                mEnv->popStack();
+            }
+            
         }
     }
 

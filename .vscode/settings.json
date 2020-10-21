@@ -5,6 +5,13 @@
         "deque": "cpp",
         "string": "cpp",
         "string_view": "cpp",
-        "vector": "cpp"
+        "vector": "cpp",
+        "__bit_reference": "cpp",
+        "__hash_table": "cpp",
+        "filesystem": "cpp",
+        "initializer_list": "cpp",
+        "iterator": "cpp",
+        "unordered_map": "cpp",
+        "iostream": "cpp"
     }
 }

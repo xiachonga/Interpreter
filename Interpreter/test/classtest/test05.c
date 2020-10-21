@@ -3,12 +3,13 @@ extern void * MALLOC(int);
 extern void FREE(void *);
 extern void PRINT(int);
 
-int b = 10;
-int c = b + 10;
 int main() {
    int a;
-   a=100;
+   int b = 0;
+   a = 10;
+   while ( b < a) {
+     b = b + 1;
+   }
+
    PRINT(b);
-   PRINT(c); 
-   PRINT(a);
 }

@@ -3,12 +3,14 @@ extern void * MALLOC(int);
 extern void FREE(void *);
 extern void PRINT(int);
 
-int b = 10;
-int c = b + 10;
+
 int main() {
-   int a;
-   a=100;
-   PRINT(b);
-   PRINT(c); 
-   PRINT(a);
+   int* a;
+   int b;
+   b = 10;
+   
+   a = (int*)MALLOC(sizeof(int));
+   *a = b;
+   PRINT(*a);
+   FREE(a);
 }

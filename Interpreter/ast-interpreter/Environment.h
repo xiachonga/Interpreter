@@ -19,10 +19,16 @@ class StackFrame
     std::map<Stmt *, int> mExprs;
     /// The current stmt
     Stmt *mPC;
-
+    int returnFlag;
 public:
-    StackFrame() : mVars(), mExprs(), mPC()
+    StackFrame() : mVars(), mExprs(), mPC(), returnFlag(0)
     {
+    }
+    void setAlreadyReturn() {
+        returnFlag = 1;
+    }
+    int getAlreadyReturn() {
+        return returnFlag;
     }
     bool hasDeclVal(Decl *decl) 
     {
@@ -111,6 +117,17 @@ public:
     std::vector<StackFrame> getStack() 
     {
         return mStack;    
+    }
+    void setAlreadyReturn() {
+        mStack.back().setAlreadyReturn();
+    }
+    bool alreadyReturn() {
+        int flag = mStack.back().getAlreadyReturn();
+        if (flag == 0) {
+            return false;
+        } else {
+            return true;
+        }
     }
     int mallocHeap(int size)
     {
@@ -222,7 +239,7 @@ public:
     {
         Expr *left = bop->getLHS();
         Expr *right = bop->getRHS();
-
+        
         if (bop->isAssignmentOp())
         {
             int val = mStack.back().getStmtVal(right);
@@ -402,6 +419,7 @@ public:
             Expr *decl = callexpr->getArg(0);
             val = mStack.back().getStmtVal(decl);
             llvm::errs() << val;
+            cout<<endl;
         }
         else if (callee == mMalloc)
         {

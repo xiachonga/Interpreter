@@ -3,12 +3,20 @@ extern void * MALLOC(int);
 extern void FREE(void *);
 extern void PRINT(int);
 
-int b = 10;
-int c = b + 10;
+int  x(int y) {
+	return y + 10;
+}
+
+int  f(int b) {
+   return x(b) + 10;
+}
+
 int main() {
    int a;
-   a=100;
-   PRINT(b);
-   PRINT(c); 
+   a = 10;
+
+   a = f(a);
    PRINT(a);
+   return 0;
 }
+
